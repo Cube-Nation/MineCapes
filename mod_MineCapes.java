@@ -1,5 +1,6 @@
 package net.minecraft.src;
 
+import java.awt.image.BufferedImage;
 import java.io.InputStreamReader;
 import java.io.BufferedReader;
 import java.util.*;
@@ -10,20 +11,25 @@ public class mod_MineCapes extends BaseMod
 {
 	int tick;
 	int sweep = 20;
-	
+
+	private ArrayList<String> capeDIRs = null;
+
 	private HashMap<String, String> checked = new HashMap<String, String>();
 	private ArrayList<String> ignored = new ArrayList<String>();
-	private ArrayList<String> capeURLs = null;
 	private Thread checkThread = null;
+	
+	private String stdCapesDir	= "http://www.minecapes.net/players/cape/";
+	private String hdCapesDir	= "http://www.minecapes.net/players/hdcape/";
 	
     boolean checking = false;
     boolean reloading = false;
+    int _iCanHazHDMod = -1;
 
     public mod_MineCapes() {
     }
     
 	public String getVersion() {
-    	return "1.3";
+    	return "1.4.1";
 	}
     
     public void load() {
@@ -104,23 +110,30 @@ public class mod_MineCapes extends BaseMod
     	new Thread() {
             public void run() {
            		System.out.println("[MineCapes] Searching for capes directories ...");
+           		
+    			ArrayList<String> _capeDIRs = new ArrayList<String>();
         		try {
-        			ArrayList<String> _capeURLs = new ArrayList<String>();
-
         	        URL dirList = new URL("http://www.minecapes.net/capesDirectory.list");
            	     	BufferedReader in = new BufferedReader(new InputStreamReader(dirList.openStream()));
 
                 	String inputLine;
-                	while ((inputLine = in.readLine()) != null) _capeURLs.add(inputLine);
+                	while ((inputLine = in.readLine()) != null) _capeDIRs.add(inputLine);
                 	in.close();
-                	
-        			System.out.println("[MineCapes] " + _capeURLs.size() + " Directories loaded!");
-        			capeURLs = _capeURLs;
         			
         		} catch (Exception e) {
-        			System.out.println("[MineCapes] Directories could not be loaded. Try again on restart...");
-
+        			System.out.println("[MineCapes] External cape directories could not be found. Try again on restart...");
         		}
+
+        		// add default dir
+        		_capeDIRs.add(0, stdCapesDir);
+
+        		if (iCanHazHDMod()) {
+        			System.out.println("[MineCapes] Found HD Patch! Adding HD directory.");
+        			_capeDIRs.add(0, hdCapesDir);
+        		}
+
+    			System.out.println("[MineCapes] " + _capeDIRs.size() + " directories loaded!");
+    			capeDIRs = _capeDIRs;
             }
 
     	}.start();
@@ -139,8 +152,20 @@ public class mod_MineCapes extends BaseMod
 	    }
     }
     
+    private boolean iCanHazHDMod() {
+    	if (_iCanHazHDMod == -1) {
+        	if (new ImageBufferDownload().parseUserSkin(new BufferedImage(128,64,BufferedImage.TYPE_INT_RGB)).getWidth() == 64) {
+        		_iCanHazHDMod = 0;
+        	} else {
+        		_iCanHazHDMod = 1;
+        	}
+    	}
+    	return (_iCanHazHDMod == 1 ? true : false);
+    	
+    }
+    
     private void updateCloakURLs() {
-    	if (capeURLs == null) return;
+    	if (capeDIRs == null || capeDIRs.isEmpty()) return;
     	if (checking || reloading) return;
     	
     	if (tick >= sweep) {
@@ -177,7 +202,7 @@ public class mod_MineCapes extends BaseMod
                 	   		System.out.println("[MineCapes] Found new player: " + entityplayer.username);
                 	   		
                 	   		boolean found = false;
-                	   		for (String capeURLcheck : capeURLs) {
+                	   		for (String capeURLcheck : capeDIRs) {
                 	  			String url = (new StringBuilder()).append(capeURLcheck).append(playerName).append(".png").toString();
                 	  			
                 	  			try {
