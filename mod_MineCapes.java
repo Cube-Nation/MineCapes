@@ -29,7 +29,7 @@ public class mod_MineCapes extends BaseMod
     }
     
 	public String getVersion() {
-    	return "1.4.3";
+    	return "1.5";
 	}
     
     public void load() {
