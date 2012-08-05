@@ -29,7 +29,7 @@ public class mod_MineCapes extends BaseMod
     }
     
 	public String getVersion() {
-    	return "1.4.1";
+    	return "1.4.3";
 	}
     
     public void load() {
@@ -208,6 +208,7 @@ public class mod_MineCapes extends BaseMod
                 	  			try {
               						HttpURLConnection.setFollowRedirects(false);
               						HttpURLConnection con =	(HttpURLConnection) new URL(url).openConnection();
+              						con.setConnectTimeout(2000);
               						con.setRequestMethod("HEAD");
         							if (con.getResponseCode() == HttpURLConnection.HTTP_OK) {
         							
@@ -223,6 +224,7 @@ public class mod_MineCapes extends BaseMod
         				           		break;
 
         							}
+        							con.disconnect();
         							
             					} catch (Exception e) {}
 
