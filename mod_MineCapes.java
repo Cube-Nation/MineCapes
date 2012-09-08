@@ -28,7 +28,7 @@ public class mod_MineCapes extends BaseMod
     }
     
 	public String getVersion() {
-    	return "1.7";
+    	return "1.8";
 	}
     
     public void load() {
@@ -163,13 +163,11 @@ public class mod_MineCapes extends BaseMod
                 	List<EntityPlayer> playerEntities = mc.theWorld.playerEntities; //get the players
                 	
                 	if (shouldClear) {
-                		clearCloaks(playerEntities, mc);
                 		shouldClear = false;
-                		
-                	} else {
-                		checkCloakURLs(playerEntities, mc);
-                		
+                		clearCloaks(playerEntities, mc);
                 	}
+                	
+            		checkCloakURLs(playerEntities, mc);
                 	
                 	checking = false;
                 }
@@ -184,9 +182,7 @@ public class mod_MineCapes extends BaseMod
        	
     }
 
-	protected void checkCloakURLs(List<EntityPlayer> playerEntities, Minecraft mc) {
-		HttpURLConnection.setFollowRedirects(false);
-		
+	protected void checkCloakURLs(List<EntityPlayer> playerEntities, Minecraft mc) {		
     	for (EntityPlayer entityplayer : playerEntities) {    		
     	   	String playerName = entityplayer.username;
     	   	
@@ -211,8 +207,12 @@ public class mod_MineCapes extends BaseMod
     	   			String url = capeURLcheck + playerName + ".png";
     	  			try {
   						HttpURLConnection con =	(HttpURLConnection) new URL(url).openConnection();
-  						con.setConnectTimeout(2000);
   						con.setRequestMethod("HEAD");
+  						con.setRequestProperty ( "User-agent", "MineCapes " + getVersion());
+  						con.setRequestProperty ( "Java-Version", System.getProperty("java.version"));
+  						con.setConnectTimeout(2000);
+  						con.setDefaultUseCaches(false);
+  						con.setFollowRedirects(false);
 						if (con.getResponseCode() == HttpURLConnection.HTTP_OK) {
 							System.out.println("[MineCapes] Found cloak: " + url);
 			           		found = url;
