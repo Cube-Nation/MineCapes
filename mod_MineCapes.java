@@ -9,27 +9,26 @@ import net.minecraft.client.Minecraft;
 
 public class mod_MineCapes extends BaseMod
 {
-	int tick;
-	int sweep = 20;
+	int tick = 1337;
+	int sweep = 60;
 
 	private ArrayList<String> capeDIRs = null;
 
 	private HashMap<String, String> checked = new HashMap<String, String>();
 	private ArrayList<String> ignored = new ArrayList<String>();
-	private Thread checkThread = null;
 	
 	private String stdCapesDir	= "http://www.minecapes.net/players/cape/";
 	private String hdCapesDir	= "http://www.minecapes.net/players/hdcape/";
 	
     boolean checking = false;
-    boolean reloading = false;
+    boolean shouldClear = false;
     int _iCanHazHDMod = -1;
 
     public mod_MineCapes() {
     }
     
 	public String getVersion() {
-    	return "1.5";
+    	return "1.7";
 	}
     
     public void load() {
@@ -61,14 +60,6 @@ public class mod_MineCapes extends BaseMod
     ///// private stuff
     //////////////////////////////////////////
     
-    private void cancelCheck() {
-    	if (checking && checkThread != null) {
-	    	checkThread.interrupt();
-	    	checkThread = null;
-	    	checking = false;
-    	}
-    }
-    
     private void checkForUpdate() {
     	new Thread() {
             public void run() {
@@ -89,21 +80,18 @@ public class mod_MineCapes extends BaseMod
     	}.start();
     }
     
-    private void clearCloaks() {
-    	Minecraft mc = ModLoader.getMinecraftInstance();
-    	List playerEntities = mc.theWorld.playerEntities; //get the players
-    	for (int i = 0; i < playerEntities.size(); i++)
+    private void clearCloaks(List<EntityPlayer> playerEntities, Minecraft mc) {
+    	checked.clear();
+    	ignored.clear();
+    	
+    	for (EntityPlayer entityplayer : playerEntities)
    		{
-    	   	EntityPlayer entityplayer = (EntityPlayer)playerEntities.get(i);
     	   	String cloakURL = entityplayer.cloakUrl;
     	   	if (cloakURL != null) {
     	   		mc.renderEngine.releaseImageData(cloakURL);
            		System.out.println("[MineCapes] Cleared cape for " + entityplayer.username);
     	   	}
    		}
-
-    	checked.clear();
-    	ignored.clear();
     }
     
     private void findCapesDirectories() {
@@ -143,12 +131,7 @@ public class mod_MineCapes extends BaseMod
     private void handleMCMessage(String message) {
 		System.out.println("[MineCapes] Got a message: " + message);
 	    if (message.equalsIgnoreCase("reloadCapes")) {
-			reloading = true;
-			
-			cancelCheck();
-	    	clearCloaks();
-
-	    	reloading = false;
+	    	shouldClear = true;
 	    }
     }
     
@@ -166,82 +149,29 @@ public class mod_MineCapes extends BaseMod
     
     private void updateCloakURLs() {
     	if (capeDIRs == null || capeDIRs.isEmpty()) return;
-    	if (checking || reloading) return;
+    	if (checking) return;
     	
     	if (tick >= sweep) {
     		tick = 0;
-    		
     		checking = true;
-    		checkThread = new Thread() {
+    		
+    		Thread checkThread = new Thread() {
                 public void run() {
         	    	Minecraft mc = ModLoader.getMinecraftInstance();
             		if (mc == null || mc.theWorld == null || mc.theWorld.playerEntities == null || mc.renderEngine == null) return;
             	
-                	List playerEntities = mc.theWorld.playerEntities; //get the players
-                	for (int i = 0; i < playerEntities.size(); i++)
-               		{
-                		if (Thread.interrupted()) break;
+                	List<EntityPlayer> playerEntities = mc.theWorld.playerEntities; //get the players
+                	
+                	if (shouldClear) {
+                		clearCloaks(playerEntities, mc);
+                		shouldClear = false;
                 		
-                	   	EntityPlayer entityplayer = (EntityPlayer)playerEntities.get(i);
-                	   	String playerName = entityplayer.username;
-                	   	
-                	   	if (ignored.contains(playerName)) {
-                	   		// ignore
-                	   		
-                	   	} else if (checked.containsKey(playerName)) {
-                	   		String checkURL = checked.get(playerName);
-                	   		
-                	   		if (!entityplayer.playerCloakUrl.equalsIgnoreCase(checkURL)) {
-                	   			entityplayer.playerCloakUrl = checkURL;
-        		        		entityplayer.cloakUrl = checkURL;
-                    			mc.renderEngine.obtainImageData(checkURL, new ImageBufferDownload());
-                	   		}
-                	   		
-                	   	} else {
-                	   	
-                	   		System.out.println("[MineCapes] Found new player: " + entityplayer.username);
-                	   		
-                	   		boolean found = false;
-                	   		for (String capeURLcheck : capeDIRs) {
-                	  			String url = (new StringBuilder()).append(capeURLcheck).append(playerName).append(".png").toString();
-                	  			
-                	  			try {
-              						HttpURLConnection.setFollowRedirects(false);
-              						HttpURLConnection con =	(HttpURLConnection) new URL(url).openConnection();
-              						con.setConnectTimeout(2000);
-              						con.setRequestMethod("HEAD");
-        							if (con.getResponseCode() == HttpURLConnection.HTTP_OK) {
-        							
-        								System.out.println("[MineCapes] Found cloak: " + url);
-
-        		       					entityplayer.playerCloakUrl = url;
-        		        				entityplayer.cloakUrl = url;
-                    					mc.renderEngine.obtainImageData(url, new ImageBufferDownload());
-                    					
-                                		if (Thread.interrupted()) break;
-        				           		checked.put(entityplayer.username, url);
-        				           		found = true;
-        				           		break;
-
-        							}
-        							con.disconnect();
-        							
-            					} catch (Exception e) {}
-
-                	   		}
-                	   		
-                    		if (Thread.interrupted()) break;
-                	   		
-                	   		if (!found) {
-                	   			ignored.add(entityplayer.username);
-                	   			System.out.println("[MineCapes] Could not find any cloak, ignoring ...");
-        					}
-                   		}
-                   		
-               		}
+                	} else {
+                		checkCloakURLs(playerEntities, mc);
+                		
+                	}
                 	
                 	checking = false;
-                	checkThread = null;
                 }
     		};
     		
@@ -253,5 +183,61 @@ public class mod_MineCapes extends BaseMod
        	}
        	
     }
+
+	protected void checkCloakURLs(List<EntityPlayer> playerEntities, Minecraft mc) {
+		HttpURLConnection.setFollowRedirects(false);
+		
+    	for (EntityPlayer entityplayer : playerEntities) {    		
+    	   	String playerName = entityplayer.username;
+    	   	
+    	   	if (ignored.contains(playerName)) {
+    	   		// ignore
+    	   		
+    	   	} else if (checked.containsKey(playerName)) {
+    	   		String checkURL = checked.get(playerName);
+    	   		
+    	   		if (!entityplayer.playerCloakUrl.equalsIgnoreCase(checkURL)) {
+    	   			entityplayer.playerCloakUrl = checkURL;
+	        		entityplayer.cloakUrl = checkURL;
+        			mc.renderEngine.obtainImageData(checkURL, new ImageBufferDownload());
+    	   		}
+    	   		
+    	   	} else {
+    	   		System.out.println("[MineCapes] Found new player: " + playerName);
+    	   		
+    	   		String found = null;
+    	   		for (String capeURLcheck : capeDIRs) {
+
+    	   			String url = capeURLcheck + playerName + ".png";
+    	  			try {
+  						HttpURLConnection con =	(HttpURLConnection) new URL(url).openConnection();
+  						con.setConnectTimeout(2000);
+  						con.setRequestMethod("HEAD");
+						if (con.getResponseCode() == HttpURLConnection.HTTP_OK) {
+							System.out.println("[MineCapes] Found cloak: " + url);
+			           		found = url;
+						}
+						con.disconnect();
+						
+					} catch (Exception e) {}
+
+					if (found != null) break;
+    	   		}
+    	   		    	   		
+    	   		if (found != null) {
+	           		checked.put(playerName, found);
+	           		
+    	   			entityplayer.playerCloakUrl = found;
+	        		entityplayer.cloakUrl = found;
+        			mc.renderEngine.obtainImageData(found, new ImageBufferDownload());
+
+    	   		} else {
+    	   			ignored.add(playerName);
+    	   			System.out.println("[MineCapes] Could not find any cloak, ignoring ...");
+				}
+       		}
+       		
+   		}		
+	}
 
 }
