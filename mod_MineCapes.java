@@ -4,6 +4,7 @@ import java.awt.image.BufferedImage;
 import java.io.InputStreamReader;
 import java.io.BufferedReader;
 import java.util.*;
+import java.util.logging.Handler;
 import java.net.*;
 import net.minecraft.client.Minecraft;
 
@@ -15,6 +16,7 @@ public class mod_MineCapes extends BaseMod
 	private ArrayList<String> capeDIRs = null;
 
 	private HashMap<String, String> checked = new HashMap<String, String>();
+	private ArrayList<String> applied = new ArrayList<String>();
 	private ArrayList<String> ignored = new ArrayList<String>();
 	
 	private String stdCapesDir	= "http://www.minecapes.net/players/cape/";
@@ -28,7 +30,7 @@ public class mod_MineCapes extends BaseMod
     }
     
 	public String getVersion() {
-    	return "1.8";
+    	return "1.9";
 	}
     
     public void load() {
@@ -38,11 +40,11 @@ public class mod_MineCapes extends BaseMod
 		findCapesDirectories();
     }
     
-    public void serverConnect(NetClientHandler netclienthandler) {
+    public void clientConnect(NetClientHandler netclienthandler) {
     	checkForUpdate();
     }
     
-	public void receiveCustomPacket(Packet250CustomPayload packet250custompayload) {
+	public void clientCustomPayload(NetClientHandler clientHandler, Packet250CustomPayload packet250custompayload) {
 		if (packet250custompayload.channel.equalsIgnoreCase("minecapes")) {
 			handleMCMessage(new String(packet250custompayload.data));
 		}
@@ -61,6 +63,8 @@ public class mod_MineCapes extends BaseMod
     //////////////////////////////////////////
     
     private void checkForUpdate() {
+    	System.out.println("[MineCapes] Checking for a new MineCapes Version now...");
+
     	new Thread() {
             public void run() {
             	try {
@@ -69,17 +73,23 @@ public class mod_MineCapes extends BaseMod
 
                 	final String inputLine = in.readLine();
                 	if (inputLine != null && !inputLine.equals(getVersion())) {
+            			System.out.println("There's a new version of MineCapes (Version "+inputLine+")! Go get it from: minecapes.net/install");
+            			
                 		new java.util.Timer().schedule(new TimerTask() {
         					@Override
         					public void run() {
         				    	ModLoader.getMinecraftInstance().thePlayer.addChatMessage("There's a new version of MineCapes (Version "+inputLine+")! Go get it from: minecapes.net/install");
         					}}, 2000);
                 	}
-        		} catch (Exception e) {}
+        		} catch (Exception e) {
+        			System.out.println("[MineCapes] Could not check for a new MineCapes Version :-(");
+
+        		}
             }
     	}.start();
     }
     
+
     private void clearCloaks(List<EntityPlayer> playerEntities, Minecraft mc) {
     	checked.clear();
     	ignored.clear();
@@ -154,21 +164,31 @@ public class mod_MineCapes extends BaseMod
     	if (tick >= sweep) {
     		tick = 0;
     		checking = true;
+
+	    	final Minecraft mc = ModLoader.getMinecraftInstance();
+    		if (mc == null || mc.theWorld == null || mc.theWorld.playerEntities == null || mc.renderEngine == null) return;
+        	final List<EntityPlayer> playerEntities = mc.theWorld.playerEntities; //get the players
+
+        	if (shouldClear) {
+        		shouldClear = false;
+        		clearCloaks(playerEntities, mc);
+        	}
+        	
+        	for (EntityPlayer entityplayer : playerEntities) {
+        	   	String playerName = entityplayer.username;
+        	   	if (!checked.containsKey(playerName)) return;
+        	   	
+    	   		String checkURL = checked.get(playerName);
+    	   		if (!entityplayer.playerCloakUrl.equalsIgnoreCase(checkURL)) {
+    	   			entityplayer.playerCloakUrl = checkURL;
+	        		entityplayer.cloakUrl = checkURL;
+        			mc.renderEngine.obtainImageData(checkURL, new ImageBufferDownload());
+    	   		}
+        	}
     		
     		Thread checkThread = new Thread() {
                 public void run() {
-        	    	Minecraft mc = ModLoader.getMinecraftInstance();
-            		if (mc == null || mc.theWorld == null || mc.theWorld.playerEntities == null || mc.renderEngine == null) return;
-            	
-                	List<EntityPlayer> playerEntities = mc.theWorld.playerEntities; //get the players
-                	
-                	if (shouldClear) {
-                		shouldClear = false;
-                		clearCloaks(playerEntities, mc);
-                	}
-                	
             		checkCloakURLs(playerEntities, mc);
-                	
                 	checking = false;
                 }
     		};
@@ -186,56 +206,43 @@ public class mod_MineCapes extends BaseMod
     	for (EntityPlayer entityplayer : playerEntities) {    		
     	   	String playerName = entityplayer.username;
     	   	
-    	   	if (ignored.contains(playerName)) {
-    	   		// ignore
-    	   		
-    	   	} else if (checked.containsKey(playerName)) {
-    	   		String checkURL = checked.get(playerName);
-    	   		
-    	   		if (!entityplayer.playerCloakUrl.equalsIgnoreCase(checkURL)) {
-    	   			entityplayer.playerCloakUrl = checkURL;
-	        		entityplayer.cloakUrl = checkURL;
-        			mc.renderEngine.obtainImageData(checkURL, new ImageBufferDownload());
-    	   		}
-    	   		
-    	   	} else {
-    	   		System.out.println("[MineCapes] Found new player: " + playerName);
-    	   		
-    	   		String found = null;
-    	   		for (String capeURLcheck : capeDIRs) {
+    	   	if (ignored.contains(playerName) || checked.containsKey(playerName)) continue;
+    	   	
+	   		System.out.println("[MineCapes] Found new player: " + playerName);
+	   		
+	   		String found = null;
+	   		for (String capeURLcheck : capeDIRs) {
 
-    	   			String url = capeURLcheck + playerName + ".png";
-    	  			try {
-  						HttpURLConnection con =	(HttpURLConnection) new URL(url).openConnection();
-  						con.setRequestMethod("HEAD");
-  						con.setRequestProperty ( "User-agent", "MineCapes " + getVersion());
-  						con.setRequestProperty ( "Java-Version", System.getProperty("java.version"));
-  						con.setConnectTimeout(2000);
-  						con.setDefaultUseCaches(false);
-  						con.setFollowRedirects(false);
-						if (con.getResponseCode() == HttpURLConnection.HTTP_OK) {
-							System.out.println("[MineCapes] Found cloak: " + url);
-			           		found = url;
-						}
-						con.disconnect();
-						
-					} catch (Exception e) {}
+	   			String url = capeURLcheck + playerName + ".png";
+	  			try {
+					HttpURLConnection con =	(HttpURLConnection) new URL(url).openConnection();
+					con.setRequestMethod("HEAD");
+					con.setRequestProperty ( "User-agent", "MineCapes " + getVersion());
+					con.setRequestProperty ( "Java-Version", System.getProperty("java.version"));
+					con.setConnectTimeout(2000);
+					con.setDefaultUseCaches(false);
+					con.setFollowRedirects(false);
+					
+					if (con.getResponseCode() == HttpURLConnection.HTTP_OK) found = url;
 
-					if (found != null) break;
-    	   		}
-    	   		    	   		
-    	   		if (found != null) {
-	           		checked.put(playerName, found);
-	           		
-    	   			entityplayer.playerCloakUrl = found;
-	        		entityplayer.cloakUrl = found;
-        			mc.renderEngine.obtainImageData(found, new ImageBufferDownload());
+					con.disconnect();
+					
+				} catch (Exception e) {}
+	  			
 
-    	   		} else {
-    	   			ignored.add(playerName);
-    	   			System.out.println("[MineCapes] Could not find any cloak, ignoring ...");
-				}
-       		}
+				if (found != null) break;
+	   		}
+	   		
+	   		if (found == null) {
+	   			ignored.add(playerName);
+	   			System.out.println("[MineCapes] Could not find any cloak, ignoring ...");
+	   			
+	   		} else {
+	       		checked.put(playerName, found);
+				System.out.println("[MineCapes] Found cloak: " + found);
+
+	   		}
+	   		
        		
    		}		
 	}
