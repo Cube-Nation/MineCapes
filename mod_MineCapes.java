@@ -91,6 +91,8 @@ public class mod_MineCapes extends BaseMod
     
 
     private void clearCloaks(List<EntityPlayer> playerEntities, Minecraft mc) {
+   		System.out.println("[MineCapes] Clearing capes...");
+   		
     	checked.clear();
     	ignored.clear();
     	
@@ -176,9 +178,10 @@ public class mod_MineCapes extends BaseMod
         	
         	for (EntityPlayer entityplayer : playerEntities) {
         	   	String playerName = entityplayer.username;
-        	   	if (!checked.containsKey(playerName)) return;
-        	   	
     	   		String checkURL = checked.get(playerName);
+
+        	   	if (checkURL == null) continue;
+    	   		
     	   		if (!entityplayer.playerCloakUrl.equalsIgnoreCase(checkURL)) {
     	   			entityplayer.playerCloakUrl = checkURL;
 	        		entityplayer.cloakUrl = checkURL;
@@ -201,6 +204,10 @@ public class mod_MineCapes extends BaseMod
        	}
        	
     }
+    
+    private String removeColorFromString(String string) {
+    	return string.replaceAll("\\xa.{2}", "");
+    }
 
 	protected void checkCloakURLs(List<EntityPlayer> playerEntities, Minecraft mc) {		
     	for (EntityPlayer entityplayer : playerEntities) {    		
@@ -213,7 +220,7 @@ public class mod_MineCapes extends BaseMod
 	   		String found = null;
 	   		for (String capeURLcheck : capeDIRs) {
 
-	   			String url = capeURLcheck + playerName + ".png";
+	   			String url = capeURLcheck + removeColorFromString(playerName) + ".png";
 	  			try {
 					HttpURLConnection con =	(HttpURLConnection) new URL(url).openConnection();
 					con.setRequestMethod("HEAD");
