@@ -18,6 +18,8 @@ public class mod_MineCapes extends BaseMod
 	private HashMap<String, String> checked = new HashMap<String, String>();
 	private ArrayList<String> applied = new ArrayList<String>();
 	private ArrayList<String> ignored = new ArrayList<String>();
+	private ArrayList<String> players = new ArrayList<String>();
+
 	
 	private String stdCapesDir	= "http://www.minecapes.net/players/cape/";
 	private String hdCapesDir	= "http://www.minecapes.net/players/hdcape/";
@@ -176,12 +178,14 @@ public class mod_MineCapes extends BaseMod
         		clearCloaks(playerEntities, mc);
         	}
         	
+        	players.clear();
         	for (EntityPlayer entityplayer : playerEntities) {
         	   	String playerName = entityplayer.username;
+        	   	players.add(playerName);
+        	   	
     	   		String checkURL = checked.get(playerName);
-
         	   	if (checkURL == null) continue;
-    	   		
+        	   	
     	   		if (!entityplayer.playerCloakUrl.equalsIgnoreCase(checkURL)) {
     	   			entityplayer.playerCloakUrl = checkURL;
 	        		entityplayer.cloakUrl = checkURL;
@@ -191,7 +195,7 @@ public class mod_MineCapes extends BaseMod
     		
     		Thread checkThread = new Thread() {
                 public void run() {
-            		checkCloakURLs(playerEntities, mc);
+            		checkCloakURLs(players, mc);
                 	checking = false;
                 }
     		};
@@ -206,12 +210,14 @@ public class mod_MineCapes extends BaseMod
     }
     
     private String removeColorFromString(String string) {
-    	return string.replaceAll("\\xa.{2}", "");
+    	string = string.replaceAll("\\xa4\\w", "");
+    	string = string.replaceAll("\\xa7\\w", "");
+    	
+    	return string;
     }
 
-	protected void checkCloakURLs(List<EntityPlayer> playerEntities, Minecraft mc) {		
-    	for (EntityPlayer entityplayer : playerEntities) {    		
-    	   	String playerName = entityplayer.username;
+	protected void checkCloakURLs(List<String> playerNames, Minecraft mc) {		
+    	for (String playerName : playerNames) {    		
     	   	
     	   	if (ignored.contains(playerName) || checked.containsKey(playerName)) continue;
     	   	
