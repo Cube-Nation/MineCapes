@@ -42,14 +42,25 @@ public class mod_MineCapes extends BaseMod
 		findCapesDirectories();
     }
     
-    public void clientConnect(NetClientHandler netclienthandler) {
+    // ModLoader @ MC 1.2.5
+    public void serverConnect(NetClientHandler netclienthandler) {
     	checkForUpdate();
     }
+	// ModLoader @ MC 1.3+
+    public void clientConnect(NetClientHandler netclienthandler) {
+    	serverConnect(netclienthandler);
+    }
     
-	public void clientCustomPayload(NetClientHandler clientHandler, Packet250CustomPayload packet250custompayload) {
+
+    // ModLoader @ MC 1.2.5
+	public void receiveCustomPacket(Packet250CustomPayload packet250custompayload) {
 		if (packet250custompayload.channel.equalsIgnoreCase("minecapes")) {
 			handleMCMessage(new String(packet250custompayload.data));
 		}
+	}
+	// ModLoader @ MC 1.3+
+	public void clientCustomPayload(NetClientHandler clientHandler, Packet250CustomPayload packet250custompayload) {
+		receiveCustomPacket(packet250custompayload);
     }
     
     public boolean onTickInGame(float f, Minecraft minecraft)
