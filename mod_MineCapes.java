@@ -10,8 +10,8 @@ import net.minecraft.client.Minecraft;
 
 public class mod_MineCapes extends BaseMod
 {
-	int tick = 1337;
-	int sweep = 60;
+	int tick = 0;
+	int sweep = 20;
 
 	private ArrayList<String> capeDIRs = null;
 
@@ -111,9 +111,11 @@ public class mod_MineCapes extends BaseMod
     	
     	for (EntityPlayer entityplayer : playerEntities)
    		{
-    	   	String cloakURL = entityplayer.cloakUrl;
+    	   	String cloakURL = entityplayer.playerCloakUrl;
     	   	if (cloakURL != null) {
     	   		mc.renderEngine.releaseImageData(cloakURL);
+	   			entityplayer.playerCloakUrl = null;
+        		entityplayer.cloakUrl = null;
            		System.out.println("[MineCapes] Cleared cape for " + entityplayer.username);
     	   	}
    		}
@@ -178,39 +180,45 @@ public class mod_MineCapes extends BaseMod
     	
     	if (tick >= sweep) {
     		tick = 0;
-    		checking = true;
-
+    		
 	    	final Minecraft mc = ModLoader.getMinecraftInstance();
-    		if (mc == null || mc.theWorld == null || mc.theWorld.playerEntities == null || mc.renderEngine == null) return;
+    		if (mc == null || mc.theWorld == null || mc.theWorld.playerEntities == null || mc.renderEngine == null) {
+    			return;
+    		}
+    		
         	final List<EntityPlayer> playerEntities = mc.theWorld.playerEntities; //get the players
 
+        	// clear cloaks if requested
         	if (shouldClear) {
         		shouldClear = false;
         		clearCloaks(playerEntities, mc);
+        		tick = sweep;
+        		return;
         	}
         	
+        	// apply found cloaks
         	players.clear();
         	for (EntityPlayer entityplayer : playerEntities) {
         	   	String playerName = entityplayer.username;
         	   	players.add(playerName);
         	   	
     	   		String checkURL = checked.get(playerName);
-        	   	if (checkURL == null) continue;
-        	   	
-    	   		if (!entityplayer.playerCloakUrl.equalsIgnoreCase(checkURL)) {
+    	   		if (checkURL != null && !checkURL.equalsIgnoreCase(entityplayer.playerCloakUrl)) {
+    		   		System.out.println("[MineCapes] Applying cape for: " + playerName);
     	   			entityplayer.playerCloakUrl = checkURL;
 	        		entityplayer.cloakUrl = checkURL;
         			mc.renderEngine.obtainImageData(checkURL, new ImageBufferDownload());
     	   		}
         	}
     		
+        	// run cloak find in another tthread
+    		checking = true;
     		Thread checkThread = new Thread() {
                 public void run() {
             		checkCloakURLs(players, mc);
                 	checking = false;
                 }
     		};
-    		
     		checkThread.setPriority(Thread.MIN_PRIORITY);
     		checkThread.start();
     		
