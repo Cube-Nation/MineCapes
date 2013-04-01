@@ -32,7 +32,7 @@ public class mod_MineCapes extends BaseMod
     }
     
 	public String getVersion() {
-    	return "1.12";
+    	return "1.2";
 	}
     
     public void load() {
@@ -44,7 +44,7 @@ public class mod_MineCapes extends BaseMod
     
     // ModLoader @ MC 1.2.5
     public void serverConnect(NetClientHandler netclienthandler) {
-    	checkForUpdate();
+    	checkForUpdate(netclienthandler);
     }
 	// ModLoader @ MC 1.3+
     public void clientConnect(NetClientHandler netclienthandler) {
@@ -65,7 +65,7 @@ public class mod_MineCapes extends BaseMod
     
     public boolean onTickInGame(float f, Minecraft minecraft)
     {
-    	updateCloakURLs();
+    	updateCloakURLs(minecraft);
        	return true;
     }
     
@@ -75,7 +75,7 @@ public class mod_MineCapes extends BaseMod
     ///// private stuff
     //////////////////////////////////////////
     
-    private void checkForUpdate() {
+    private void checkForUpdate(NetClientHandler netclienthandler) {
     	System.out.println("[MineCapes] Checking for a new MineCapes Version now...");
 
     	new Thread() {
@@ -91,8 +91,14 @@ public class mod_MineCapes extends BaseMod
                 		new java.util.Timer().schedule(new TimerTask() {
         					@Override
         					public void run() {
-        				    	ModLoader.getMinecraftInstance().thePlayer.addChatMessage("There's a new version of MineCapes (Version "+inputLine+")! Go get it from: minecapes.net/install");
-        					}}, 2000);
+        						for (int i = 0; i < 10; i++) {
+        							if (ModLoader.getMinecraftInstance().isGamePaused && ModLoader.getMinecraftInstance().thePlayer != null) {
+                				    	ModLoader.getMinecraftInstance().thePlayer.addChatMessage("There's a new version of MineCapes (Version "+inputLine+")! Go get it from: minecapes.net/install");
+                				    	try { Thread.sleep(1000); } catch (InterruptedException e) {}
+                				    	return;
+        							}
+        						}
+        					}}, 5000);
                 	}
         		} catch (Exception e) {
         			System.out.println("[MineCapes] Could not check for a new MineCapes Version :-(");
@@ -111,10 +117,9 @@ public class mod_MineCapes extends BaseMod
     	
     	for (EntityPlayer entityplayer : playerEntities)
    		{
-    	   	String cloakURL = entityplayer.playerCloakUrl;
+    	   	String cloakURL = entityplayer.cloakUrl;
     	   	if (cloakURL != null) {
     	   		mc.renderEngine.releaseImageData(cloakURL);
-	   			entityplayer.playerCloakUrl = null;
         		entityplayer.cloakUrl = null;
            		System.out.println("[MineCapes] Cleared cape for " + entityplayer.username);
     	   	}
@@ -174,14 +179,13 @@ public class mod_MineCapes extends BaseMod
     	
     }
     
-    private void updateCloakURLs() {
+    private void updateCloakURLs(Minecraft mc) {
     	if (capeDIRs == null || capeDIRs.isEmpty()) return;
     	if (checking) return;
     	
     	if (tick >= sweep) {
     		tick = 0;
     		
-	    	final Minecraft mc = ModLoader.getMinecraftInstance();
     		if (mc == null || mc.theWorld == null || mc.theWorld.playerEntities == null || mc.renderEngine == null) {
     			return;
     		}
@@ -200,22 +204,22 @@ public class mod_MineCapes extends BaseMod
         	players.clear();
         	for (EntityPlayer entityplayer : playerEntities) {
         	   	String playerName = entityplayer.username;
+        	   	
         	   	players.add(playerName);
         	   	
     	   		String checkURL = checked.get(playerName);
-    	   		if (checkURL != null && !checkURL.equalsIgnoreCase(entityplayer.playerCloakUrl)) {
+    	   		if (checkURL != null && !checkURL.equalsIgnoreCase(entityplayer.cloakUrl)) {
     		   		System.out.println("[MineCapes] Applying cape for: " + playerName);
-    	   			entityplayer.playerCloakUrl = checkURL;
 	        		entityplayer.cloakUrl = checkURL;
         			mc.renderEngine.obtainImageData(checkURL, new ImageBufferDownload());
     	   		}
         	}
     		
-        	// run cloak find in another tthread
+        	// run cloak find in another thread
     		checking = true;
     		Thread checkThread = new Thread() {
                 public void run() {
-            		checkCloakURLs(players, mc);
+            		checkCloakURLs(players);
                 	checking = false;
                 }
     		};
@@ -235,7 +239,7 @@ public class mod_MineCapes extends BaseMod
     	return string;
     }
 
-	protected void checkCloakURLs(List<String> playerNames, Minecraft mc) {		
+	protected void checkCloakURLs(List<String> playerNames) {		
     	for (String playerName : playerNames) {    		
     	   	
     	   	if (ignored.contains(playerName) || checked.containsKey(playerName)) continue;
@@ -252,7 +256,7 @@ public class mod_MineCapes extends BaseMod
 					con.setRequestProperty ( "User-agent", "MineCapes " + getVersion());
 					con.setRequestProperty ( "Java-Version", System.getProperty("java.version"));
 					con.setConnectTimeout(2000);
-					con.setDefaultUseCaches(false);
+					con.setUseCaches(false);
 					con.setFollowRedirects(false);
 					
 					if (con.getResponseCode() == HttpURLConnection.HTTP_OK) found = url;
