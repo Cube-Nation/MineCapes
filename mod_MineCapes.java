@@ -1,5 +1,3 @@
-package net.minecraft.src;
-
 import java.awt.image.BufferedImage;
 import java.io.InputStreamReader;
 import java.io.BufferedReader;
@@ -7,6 +5,7 @@ import java.util.*;
 import java.util.logging.Handler;
 import java.net.*;
 import net.minecraft.client.Minecraft;
+import net.minecraft.src.*;
 
 public class mod_MineCapes extends BaseMod
 {
@@ -32,7 +31,7 @@ public class mod_MineCapes extends BaseMod
     }
     
 	public String getVersion() {
-    	return "1.2";
+    	return "1.13";
 	}
     
     public void load() {
