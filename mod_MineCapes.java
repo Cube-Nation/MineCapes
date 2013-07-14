@@ -3,9 +3,23 @@ import java.io.InputStreamReader;
 import java.io.BufferedReader;
 import java.util.*;
 import java.util.logging.Handler;
+import java.lang.reflect.Field;
 import java.net.*;
+
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.entity.AbstractClientPlayer;
+import net.minecraft.client.multiplayer.NetClientHandler;
+import net.minecraft.client.multiplayer.WorldClient;
+import net.minecraft.client.renderer.IImageBuffer;
+import net.minecraft.client.renderer.ImageBufferDownload;
+import net.minecraft.client.renderer.ThreadDownloadImageData;
+import net.minecraft.client.renderer.entity.RenderManager;
+import net.minecraft.client.renderer.texture.TextureManager;
+import net.minecraft.client.renderer.texture.TextureObject;
+import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.network.packet.Packet250CustomPayload;
 import net.minecraft.src.*;
+import net.minecraft.util.ResourceLocation;
 
 public class mod_MineCapes extends BaseMod
 {
@@ -14,7 +28,7 @@ public class mod_MineCapes extends BaseMod
 
 	private ArrayList<String> capeDIRs = null;
 
-	private HashMap<String, String> checked = new HashMap<String, String>();
+	private HashMap<String, ThreadDownloadImageData> checked = new HashMap<String, ThreadDownloadImageData>();
 	private ArrayList<String> applied = new ArrayList<String>();
 	private ArrayList<String> ignored = new ArrayList<String>();
 	private ArrayList<String> players = new ArrayList<String>();
@@ -31,7 +45,7 @@ public class mod_MineCapes extends BaseMod
     }
     
 	public String getVersion() {
-    	return "1.13";
+    	return "2.0";
 	}
     
     public void load() {
@@ -91,7 +105,7 @@ public class mod_MineCapes extends BaseMod
         					@Override
         					public void run() {
         						for (int i = 0; i < 10; i++) {
-        							if (ModLoader.getMinecraftInstance().isGamePaused && ModLoader.getMinecraftInstance().thePlayer != null) {
+        							if (ModLoader.getMinecraftInstance().inGameHasFocus && ModLoader.getMinecraftInstance().thePlayer != null) {
                 				    	ModLoader.getMinecraftInstance().thePlayer.addChatMessage("There's a new version of MineCapes (Version "+inputLine+")! Go get it from: minecapes.net/install");
                 				    	try { Thread.sleep(1000); } catch (InterruptedException e) {}
                 				    	return;
@@ -113,16 +127,6 @@ public class mod_MineCapes extends BaseMod
    		
     	checked.clear();
     	ignored.clear();
-    	
-    	for (EntityPlayer entityplayer : playerEntities)
-   		{
-    	   	String cloakURL = entityplayer.cloakUrl;
-    	   	if (cloakURL != null) {
-    	   		mc.renderEngine.releaseImageData(cloakURL);
-        		entityplayer.cloakUrl = null;
-           		System.out.println("[MineCapes] Cleared cape for " + entityplayer.username);
-    	   	}
-   		}
     }
     
     private void findCapesDirectories() {
@@ -199,19 +203,45 @@ public class mod_MineCapes extends BaseMod
         		return;
         	}
         	
-        	// apply found cloaks
+        	// apply found cloaks / find players
         	players.clear();
         	for (EntityPlayer entityplayer : playerEntities) {
         	   	String playerName = entityplayer.username;
-        	   	
         	   	players.add(playerName);
         	   	
-    	   		String checkURL = checked.get(playerName);
-    	   		if (checkURL != null && !checkURL.equalsIgnoreCase(entityplayer.cloakUrl)) {
-    		   		System.out.println("[MineCapes] Applying cape for: " + playerName);
-	        		entityplayer.cloakUrl = checkURL;
-        			mc.renderEngine.obtainImageData(checkURL, new ImageBufferDownload());
-    	   		}
+        	   	ThreadDownloadImageData usersCape = checked.get(playerName);
+        	   	
+        	   	if (usersCape != null) {
+
+            		AbstractClientPlayer aPlayer = (AbstractClientPlayer) entityplayer;
+            	   	ThreadDownloadImageData currentCape = null;
+            	   	Field field_110315_c = null;
+            		
+            		// make cloak resource field accessible and get current cape
+                    try {
+                		field_110315_c = AbstractClientPlayer.class.getDeclaredField("field_110315_c");
+                		
+                        if (!field_110315_c.isAccessible()) field_110315_c.setAccessible(true);
+                        
+                        currentCape = (ThreadDownloadImageData) field_110315_c.get(aPlayer);
+                        
+    				} catch (Exception e) { e.printStackTrace(); }
+                    
+                    
+                    // check if needs update
+        	   		if (field_110315_c != null && usersCape != currentCape) {
+
+        		   		System.out.println("[MineCapes] Applying cape for: " + playerName);
+
+                        // set as users cloak resource
+                        try {
+    						field_110315_c.set(aPlayer, usersCape);
+    					} catch (Exception e) { e.printStackTrace(); }
+        	   			
+        	   		}
+        	   		
+        	   	}
+
         	}
     		
         	// run cloak find in another thread
@@ -273,7 +303,16 @@ public class mod_MineCapes extends BaseMod
 	   			System.out.println("[MineCapes] Could not find any cloak, ignoring ...");
 	   			
 	   		} else {
-	       		checked.put(playerName, found);
+        		AbstractClientPlayer aPlayer = (AbstractClientPlayer) Minecraft.getMinecraft().theWorld.getPlayerEntityByName(playerName);
+
+                // get cloak
+                ResourceLocation resourcePackCloak = aPlayer.func_110299_g(aPlayer.username);
+                
+                TextureManager texturemanager = Minecraft.getMinecraft().func_110434_K();
+                ThreadDownloadImageData object = new ThreadDownloadImageData(found, null, null);
+                texturemanager.func_110579_a(resourcePackCloak, (TextureObject)object);
+	   			
+	       		checked.put(playerName, object);
 				System.out.println("[MineCapes] Found cloak: " + found);
 
 	   		}
