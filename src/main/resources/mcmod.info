@@ -1,0 +1,16 @@
+[
+{
+  "modid": "minecapes",
+  "name": "MineCapes",
+  "description": "The Unified Minecraft Cape Mod",
+  "version": "${version}",
+  "mcversion": "${mcversion}",
+  "url": "",
+  "updateUrl": "",
+  "authors": ["DerFlash"],
+  "credits": "cube-nation.de",
+  "logoFile": "",
+  "screenshots": [],
+  "dependencies": []
+}
+]
